@@ -635,7 +635,7 @@ const ReportListCard = ({ reports, loading, onRefresh }) => {
 /* ─────────────────────────────────────────────
    Main Reports Page
 ───────────────────────────────────────────── */
-export default function ReportsPage({ onLogout }) {
+export default function ReportsPage() {
   const [reports, setReports]             = useState([]);
   const [reportsLoading, setReportsLoading] = useState(true);
 
@@ -655,7 +655,7 @@ export default function ReportsPage({ onLogout }) {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      <AppNav onLogout={onLogout} />
+      <AppNav />
 
       {/* Background glows */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">

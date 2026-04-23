@@ -6,8 +6,15 @@ import {
 import { TrendingDown, TrendingUp, Target, Flame, Award, Calendar, Upload, X } from "lucide-react";
 import api from '../services/api';
 import AppNav from '../components/AppNav.jsx';
+import { useToast } from '../context/ToastContext.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
+import {
+    SkeletonStatCard, SkeletonProfileCard, SkeletonChartCard, SkeletonListItem
+} from '../components/ui/Skeleton.jsx';
 
-const Dashboard = ({ user, onLogout }) => {
+const Dashboard = () => {
+    const showToast = useToast();
+    const { user } = useAuth();
     const [profile, setProfile] = useState(null);
     const [loadingProfile, setLoadingProfile] = useState(true);
 
@@ -134,10 +141,11 @@ const Dashboard = ({ user, onLogout }) => {
                 recorded_on: new Date().toISOString().split('T')[0]
             };
             await api.createProgress(progressData);
+            showToast('Progress photo uploaded!', 'success');
             await fetchAllData();
         } catch (err) {
             console.error('Failed to upload progress:', err);
-            alert('Failed to upload progress photo');
+            showToast(err.message || 'Failed to upload progress photo', 'error');
         }
     };
 
@@ -145,10 +153,11 @@ const Dashboard = ({ user, onLogout }) => {
         if (!confirm('Are you sure you want to delete this progress entry?')) return;
         try {
             await api.deleteProgress(progressId);
+            showToast('Progress entry deleted', 'info');
             await fetchAllData();
         } catch (err) {
             console.error('Failed to delete progress:', err);
-            alert('Failed to delete progress');
+            showToast(err.message || 'Failed to delete progress', 'error');
         }
     };
 
@@ -160,17 +169,6 @@ const Dashboard = ({ user, onLogout }) => {
     const weightLost = initialWeight - stats.currentWeight;
     const weightToGo = stats.currentWeight - goal.targetWeight;
     const overallProgress = weightToGo > 0 ? (weightLost / (weightLost + weightToGo)) * 100 : 0;
-
-    if (loading) {
-        return (
-            <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center">
-                <div className="text-center">
-                    <div className="w-12 h-12 border-2 border-violet-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                    <p className="text-gray-500">Loading your fitness data...</p>
-                </div>
-            </div>
-        );
-    }
 
     if (error) {
         return (
@@ -191,8 +189,8 @@ const Dashboard = ({ user, onLogout }) => {
 
     return (
         <div className="min-h-screen bg-gray-950 text-white">
-            <AppNav onLogout={onLogout} />
-            <div className="px-4 md:px-8 py-10">
+            <AppNav />
+            <div className="px-4 md:px-8 py-6 md:py-10">
             {/* Subtle background glow */}
             <div className="fixed inset-0 overflow-hidden pointer-events-none">
                 <div className="absolute top-0 left-1/4 w-96 h-96 bg-violet-500/5 rounded-full blur-3xl"></div>
@@ -202,18 +200,16 @@ const Dashboard = ({ user, onLogout }) => {
             <div className="max-w-7xl mx-auto relative z-10">
 
                 {/* Header */}
-                <div className="mb-10 animate-fade-in">
-                    <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-violet-400 to-purple-300 bg-clip-text text-transparent mb-2">
+                <div className="mb-6 md:mb-10 animate-fade-in">
+                    <h1 className="text-2xl md:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-violet-400 to-purple-300 bg-clip-text text-transparent mb-1">
                         Fitness Dashboard
                     </h1>
-                    <p className="text-gray-500">Track your progress. Stay consistent. Become unstoppable.</p>
+                    <p className="text-gray-500 text-sm md:text-base">Track your progress. Stay consistent. Become unstoppable.</p>
                 </div>
 
                 {/* Profile Summary */}
                 {loadingProfile ? (
-                    <div className="bg-gray-900 rounded-2xl p-8 mb-6 border border-gray-800 animate-pulse">
-                        <div className="h-20 bg-gray-800 rounded-xl"></div>
-                    </div>
+                    <SkeletonProfileCard />
                 ) : profile ? (
                     <div className="bg-gray-900 rounded-2xl p-6 mb-6 border border-gray-800 hover:border-gray-700 transition-colors duration-300 animate-slide-up">
                         <div className="flex flex-col md:flex-row items-start md:items-center gap-5">
@@ -238,34 +234,40 @@ const Dashboard = ({ user, onLogout }) => {
 
                 {/* Stats Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                    <StatCard
-                        title="Current Weight"
-                        value={`${stats.currentWeight} kg`}
-                        icon={<TrendingDown className="w-5 h-5 text-violet-400" />}
-                        trend={weightLost > 0 ? `-${weightLost.toFixed(1)} kg total` : "Start tracking"}
-                        delay="0"
-                    />
-                    <StatCard
-                        title="Workouts Done"
-                        value={stats.workoutsDone}
-                        icon={<Target className="w-5 h-5 text-violet-400" />}
-                        trend={stats.workoutsDone > 0 ? "Keep going!" : "Start your journey"}
-                        delay="75"
-                    />
-                    <StatCard
-                        title="Consistency"
-                        value={`${stats.consistency}%`}
-                        icon={<Award className="w-5 h-5 text-violet-400" />}
-                        trend={stats.consistency > 70 ? "Excellent!" : "Keep improving"}
-                        delay="150"
-                    />
-                    <StatCard
-                        title="Calories Burned"
-                        value={stats.caloriesBurned}
-                        icon={<Flame className="w-5 h-5 text-violet-400" />}
-                        trend="Today"
-                        delay="225"
-                    />
+                    {loading ? (
+                        Array.from({ length: 4 }).map((_, i) => <SkeletonStatCard key={i} />)
+                    ) : (
+                        <>
+                            <StatCard
+                                title="Current Weight"
+                                value={`${stats.currentWeight} kg`}
+                                icon={<TrendingDown className="w-5 h-5 text-violet-400" />}
+                                trend={weightLost > 0 ? `-${weightLost.toFixed(1)} kg total` : "Start tracking"}
+                                delay="0"
+                            />
+                            <StatCard
+                                title="Workouts Done"
+                                value={stats.workoutsDone}
+                                icon={<Target className="w-5 h-5 text-violet-400" />}
+                                trend={stats.workoutsDone > 0 ? "Keep going!" : "Start your journey"}
+                                delay="75"
+                            />
+                            <StatCard
+                                title="Consistency"
+                                value={`${stats.consistency}%`}
+                                icon={<Award className="w-5 h-5 text-violet-400" />}
+                                trend={stats.consistency > 70 ? "Excellent!" : "Keep improving"}
+                                delay="150"
+                            />
+                            <StatCard
+                                title="Calories Burned"
+                                value={stats.caloriesBurned}
+                                icon={<Flame className="w-5 h-5 text-violet-400" />}
+                                trend="Today"
+                                delay="225"
+                            />
+                        </>
+                    )}
                 </div>
 
                 {/* Progress Overview */}
@@ -309,7 +311,12 @@ const Dashboard = ({ user, onLogout }) => {
                 </div>
 
                 {/* Charts Grid */}
-                {progressData.length > 0 && (
+                {loading ? (
+                    <div className="grid lg:grid-cols-2 gap-4 mb-6">
+                        <SkeletonChartCard />
+                        <SkeletonChartCard />
+                    </div>
+                ) : progressData.length > 0 && (
                     <div className="grid lg:grid-cols-2 gap-4 mb-6">
                         <div className="bg-gray-900 rounded-2xl p-6 border border-gray-800 hover:border-gray-700 transition-colors duration-300 animate-slide-up">
                             <h2 className="text-lg font-semibold mb-5 flex items-center gap-2">

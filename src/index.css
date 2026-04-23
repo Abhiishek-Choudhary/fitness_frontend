@@ -50,3 +50,15 @@
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Safe area insets for phones with notches / home-bar */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+}
+
+/* Prevent horizontal scroll on all pages */
+body { overflow-x: hidden; }

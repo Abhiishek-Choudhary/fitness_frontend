@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Activity, Dumbbell, Camera, Plus, TrendingUp, Flame, Target, Calendar, Sparkles, Play, Upload, CheckCircle, XCircle, Video, AlertCircle, Images } from 'lucide-react';
 import AppNav from '../components/AppNav.jsx';
 import api from '../services/api.js';
+import { useAuth } from '../context/AuthContext.jsx';
 
 const TAB_BANNERS = {
   progress: {
@@ -41,7 +42,8 @@ const TabBanner = ({ tab }) => {
   );
 };
 
-export default function FitnessTracker({ user, onLogout }) {
+export default function FitnessTracker() {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('progress');
   const [selectedWorkout, setSelectedWorkout] = useState(null);
   const [selectedExercise, setSelectedExercise] = useState(null);
@@ -322,12 +324,12 @@ export default function FitnessTracker({ user, onLogout }) {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      <AppNav onLogout={onLogout} />
-      <div className="max-w-5xl mx-auto px-4 md:px-6 py-8">
+      <AppNav />
+      <div className="max-w-5xl mx-auto px-4 md:px-6 py-5 md:py-8">
 
         {/* Header */}
-        <div className="mb-8 animate-fade-in">
-          <h1 className="text-4xl font-bold text-white mb-1">Your Fitness Journey</h1>
+        <div className="mb-5 md:mb-8 animate-fade-in">
+          <h1 className="text-2xl md:text-4xl font-bold text-white mb-1">Your Fitness Journey</h1>
           <p className="text-gray-500 text-sm">Track, plan, and conquer your goals</p>
         </div>
 
@@ -782,7 +784,7 @@ export default function FitnessTracker({ user, onLogout }) {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
                     {[
                       { label: 'Calories', value: calorieResult.calories ?? calorieResult.total_calories, unit: 'kcal', color: 'text-orange-400' },
                       { label: 'Protein', value: calorieResult.protein ?? calorieResult.protein_g, unit: 'g', color: 'text-blue-400' },

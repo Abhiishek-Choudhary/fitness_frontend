@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import AppNav from '../components/AppNav.jsx';
 import api from '../services/api.js';
+// AppNav reads logout from AuthContext — no prop needed
 
 /* ─── Category config ─── */
 const CATEGORIES = [
@@ -136,7 +137,7 @@ const ErrorBanner = ({ message, onRetry }) => (
 );
 
 /* ─── Main page ─── */
-const FitnessNews = ({ onLogout }) => {
+const FitnessNews = () => {
   const [activeCategory, setActiveCategory] = useState('all');
   const [cache, setCache] = useState({});
   const [loading, setLoading] = useState(false);
@@ -251,11 +252,11 @@ const FitnessNews = ({ onLogout }) => {
 
   return (
     <div className="min-h-screen bg-gray-950">
-      <AppNav onLogout={onLogout} />
+      <AppNav />
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-4 py-5 md:py-8">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-5 md:mb-8">
           <div className="flex items-center gap-3 mb-1">
             <div className="w-9 h-9 bg-gray-900 border border-gray-800 rounded-xl flex items-center justify-center">
               <Newspaper className="w-5 h-5 text-violet-400" />

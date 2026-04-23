@@ -7,6 +7,7 @@ import {
 import AppNav from '../components/AppNav.jsx';
 import { useFeed } from '../hooks/useFeed.js';
 import api from '../services/api.js';
+import { useAuth } from '../context/AuthContext.jsx';
 
 /* ── helpers ─────────────────────────────── */
 const DIFFICULTY_BADGE = {
@@ -413,7 +414,8 @@ function CategoryChips({ categories, active, onChange }) {
 }
 
 /* ── Feed page ───────────────────────────── */
-export default function FeedPage({ user, onLogout }) {
+export default function FeedPage() {
+  const { user } = useAuth();
   const {
     activeTab, changeTab,
     activeCategory, setActiveCategory,
@@ -428,7 +430,7 @@ export default function FeedPage({ user, onLogout }) {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      <AppNav onLogout={onLogout} />
+      <AppNav />
 
       {/* Hero */}
       <div className="relative h-44 overflow-hidden">

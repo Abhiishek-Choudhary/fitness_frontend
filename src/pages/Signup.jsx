@@ -5,9 +5,11 @@ import {
   Trophy, Users, Star, ArrowRight, Check
 } from 'lucide-react';
 import api from '../services/api.js';
+import { useAuth } from '../context/AuthContext.jsx';
 
-const SignupPage = ({ onSignupSuccess }) => {
+const SignupPage = () => {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [formData, setFormData] = useState({ email: '', password: '', confirmPassword: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -29,7 +31,7 @@ const SignupPage = ({ onSignupSuccess }) => {
       localStorage.setItem('refresh_token', response.refresh);
       const user = response.user || { username: formData.email.split('@')[0], email: formData.email };
       localStorage.setItem('user', JSON.stringify(user));
-      onSignupSuccess(user);
+      login(user);
       navigate('/profile', { replace: true });
     } catch (err) {
       setError(err.message || 'Account creation failed. Please try again.');

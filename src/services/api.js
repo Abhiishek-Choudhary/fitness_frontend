@@ -1,13 +1,14 @@
 // src/services/api.js
-const API_BASE_URL = 'http://127.0.0.1:8000/api';
-const BASE_URL = 'http://127.0.0.1:8000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000/api';
+const BASE_URL = import.meta.env.VITE_BASE_URL ?? 'http://127.0.0.1:8000';
 
 /* ---------------- AUTH FETCH WRAPPER ---------------- */
 const authFetch = async (url, options = {}) => {
   let accessToken = localStorage.getItem('access_token');
 
   const headers = {
-    'Content-Type': 'application/json',
+    // Skip Content-Type for FormData — browser sets it (with boundary)
+    ...(!(options.body instanceof FormData) && { 'Content-Type': 'application/json' }),
     ...(accessToken && { Authorization: `Bearer ${accessToken}` }),
     ...options.headers,
   };
@@ -114,31 +115,18 @@ const api = {
   },
   /* ---------- FITNESS PROFILE ---------- */
   getFitnessProfile: async () => {
-    const response = await fetch(`${API_BASE_URL}/fitness/profile/`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-        'Content-Type': 'application/json'
-      },
-    });
-
+    const response = await authFetch(`${API_BASE_URL}/fitness/profile/`);
     const text = await response.text();
     const data = text ? JSON.parse(text) : null;
-
     if (!response.ok) throw new Error(data?.error || 'Failed to fetch profile');
     return data;
   },
 
   updateFitnessProfile: async (profileData) => {
-    const response = await fetch(`${API_BASE_URL}/fitness/profile/`, {
+    const response = await authFetch(`${API_BASE_URL}/fitness/profile/`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(profileData)
+      body: JSON.stringify(profileData),
     });
-
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Saving profile failed');
     return data;
@@ -834,6 +822,160 @@ const api = {
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || data.detail || 'Workout generation failed');
+    return data;
+  },
+
+  /* ---------- GYMS ---------- */
+
+  getGyms: async (params = {}) => {
+    const q = new URLSearchParams(params).toString();
+    const token = localStorage.getItem('access_token');
+    const headers = { ...(token && { Authorization: `Bearer ${token}` }) };
+    const response = await fetch(`${API_BASE_URL}/gyms/${q ? '?' + q : ''}`, { headers });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || 'Failed to fetch gyms');
+    return data;
+  },
+
+  getNearbyGyms: async ({ lat, lon, radius = 10, ...rest } = {}) => {
+    const q = new URLSearchParams({ lat, lon, radius, ...rest }).toString();
+    const token = localStorage.getItem('access_token');
+    const headers = { ...(token && { Authorization: `Bearer ${token}` }) };
+    const response = await fetch(`${API_BASE_URL}/gyms/nearby/?${q}`, { headers });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || 'Failed to fetch nearby gyms');
+    return data;
+  },
+
+  getGymDetail: async (id) => {
+    const token = localStorage.getItem('access_token');
+    const headers = { ...(token && { Authorization: `Bearer ${token}` }) };
+    const response = await fetch(`${API_BASE_URL}/gyms/${id}/`, { headers });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || 'Failed to fetch gym');
+    return data;
+  },
+
+  getMyGyms: async () => {
+    const response = await authFetch(`${API_BASE_URL}/gyms/my-gyms/`);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || 'Failed to fetch your gyms');
+    return data;
+  },
+
+  registerGym: async (formData) => {
+    const response = await authFetch(`${API_BASE_URL}/gyms/`, { method: 'POST', body: formData });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || JSON.stringify(data) || 'Registration failed');
+    return data;
+  },
+
+  updateGym: async (id, payload) => {
+    const isForm = payload instanceof FormData;
+    const response = await authFetch(`${API_BASE_URL}/gyms/${id}/`, {
+      method: 'PATCH',
+      body: isForm ? payload : JSON.stringify(payload),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || 'Update failed');
+    return data;
+  },
+
+  deleteGym: async (id) => {
+    const response = await authFetch(`${API_BASE_URL}/gyms/${id}/`, { method: 'DELETE' });
+    if (response.status === 204 || response.ok) return true;
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.detail || 'Failed to delete gym');
+  },
+
+  followGym: async (id) => {
+    const response = await authFetch(`${API_BASE_URL}/gyms/${id}/follow/`, { method: 'POST' });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || 'Action failed');
+    return data;
+  },
+
+  getGymMembers: async (id) => {
+    const response = await authFetch(`${API_BASE_URL}/gyms/${id}/members/`);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || 'Failed to fetch members');
+    return data;
+  },
+
+  upgradeGymMember: async (gymId, userId) => {
+    const response = await authFetch(`${API_BASE_URL}/gyms/${gymId}/members/${userId}/upgrade/`, { method: 'POST' });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || 'Upgrade failed');
+    return data;
+  },
+
+  uploadGymMedia: async (gymId, imageFile, caption = '') => {
+    const formData = new FormData();
+    formData.append('image', imageFile);
+    if (caption) formData.append('caption', caption);
+    const response = await authFetch(`${API_BASE_URL}/gyms/${gymId}/media/`, { method: 'POST', body: formData });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || 'Upload failed');
+    return data;
+  },
+
+  deleteGymMedia: async (mediaId) => {
+    const response = await authFetch(`${API_BASE_URL}/gyms/media/${mediaId}/`, { method: 'DELETE' });
+    if (response.status === 204 || response.ok) return true;
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.detail || 'Failed to delete media');
+  },
+
+  getGymMessages: async (gymId, userId = null) => {
+    const url = userId
+      ? `${API_BASE_URL}/gyms/${gymId}/messages/?user_id=${userId}`
+      : `${API_BASE_URL}/gyms/${gymId}/messages/`;
+    const response = await authFetch(url);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || 'Failed to fetch messages');
+    return data;
+  },
+
+  sendGymMessage: async (gymId, payload) => {
+    const response = await authFetch(`${API_BASE_URL}/gyms/${gymId}/messages/`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || 'Failed to send message');
+    return data;
+  },
+
+  getGymConversations: async (gymId) => {
+    const response = await authFetch(`${API_BASE_URL}/gyms/${gymId}/conversations/`);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || 'Failed to fetch conversations');
+    return data;
+  },
+
+  sendGymCampaign: async (gymId, payload) => {
+    const response = await authFetch(`${API_BASE_URL}/gyms/${gymId}/campaigns/`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || data.error || 'Campaign failed');
+    return data;
+  },
+
+  getGymCampaigns: async (gymId) => {
+    const token = localStorage.getItem('access_token');
+    const headers = { ...(token && { Authorization: `Bearer ${token}` }) };
+    const response = await fetch(`${API_BASE_URL}/gyms/${gymId}/campaigns/list/`, { headers });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || 'Failed to fetch campaigns');
+    return data;
+  },
+
+  getGymInbox: async () => {
+    const response = await authFetch(`${API_BASE_URL}/gyms/inbox/`);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || 'Failed to fetch gym inbox');
     return data;
   },
 

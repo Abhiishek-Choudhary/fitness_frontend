@@ -5,9 +5,11 @@ import {
   Zap, TrendingUp, Shield, ArrowRight
 } from 'lucide-react';
 import api from '../services/api.js';
+import { useAuth } from '../context/AuthContext.jsx';
 
-const LoginPage = ({ onLoginSuccess }) => {
+const LoginPage = () => {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -28,7 +30,7 @@ const LoginPage = ({ onLoginSuccess }) => {
         username: formData.email,
       };
       localStorage.setItem('user', JSON.stringify(userData));
-      onLoginSuccess(userData);
+      login(userData);
       navigate('/profile', { replace: true });
     } catch (err) {
       setError(err.message || 'Invalid email or password.');

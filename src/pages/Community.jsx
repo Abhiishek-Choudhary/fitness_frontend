@@ -10,6 +10,7 @@ import api from '../services/api.js';
 import { useEvents } from '../hooks/useEvents.js';
 import { useGroups } from '../hooks/useGroups.js';
 import { useConnections } from '../hooks/useConnections.js';
+import { useAuth } from '../context/AuthContext.jsx';
 
 /* ─── Activity images keyed by activity_type ─────── */
 const ACTIVITY_IMAGES = {
@@ -597,7 +598,8 @@ const TABS = [
 ];
 
 /* ─── Community Page ─────────────────────── */
-export default function CommunityPage({ user, onLogout }) {
+export default function CommunityPage() {
+  const { user } = useAuth();
   const [activeTab, setActiveTab]         = useState('events');
   const [location, setLocation]           = useState(null);
   const [locLoading, setLocLoading]       = useState(true);
@@ -640,7 +642,7 @@ export default function CommunityPage({ user, onLogout }) {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      <AppNav onLogout={onLogout} />
+      <AppNav />
 
       {/* Hero */}
       <div className="relative h-52 overflow-hidden">
@@ -649,8 +651,8 @@ export default function CommunityPage({ user, onLogout }) {
         <div className="absolute inset-0 bg-gradient-to-t from-gray-950 via-transparent to-transparent" />
         <div className="absolute inset-0 flex flex-col justify-center px-6 max-w-7xl mx-auto">
           <p className="text-violet-400 text-xs font-semibold uppercase tracking-widest mb-1">Together We Grow</p>
-          <h1 className="text-3xl md:text-4xl font-bold text-white">Community</h1>
-          <p className="text-gray-300 text-sm mt-1.5">Find events, join groups and connect with fitness people near you</p>
+          <h1 className="text-xl md:text-4xl font-bold text-white">Community</h1>
+          <p className="text-gray-300 text-xs md:text-sm mt-1">Find events, join groups and connect with fitness people near you</p>
         </div>
       </div>
 
@@ -679,12 +681,12 @@ export default function CommunityPage({ user, onLogout }) {
         {/* ── EVENTS TAB ── */}
         {activeTab === 'events' && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
               <p className="text-sm text-gray-500">{events.events.length} event{events.events.length !== 1 ? 's' : ''}</p>
               <div className="flex gap-2">
                 <button onClick={events.refresh} className="p-2 rounded-xl text-gray-500 hover:text-white hover:bg-gray-800 transition-all"><RefreshCw className="w-4 h-4" /></button>
-                <button onClick={() => setShowCreateEvent(true)} className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-500 rounded-xl text-sm font-medium text-white transition-all">
-                  <Plus className="w-4 h-4" /> Create Event
+                <button onClick={() => setShowCreateEvent(true)} className="flex items-center gap-2 px-3 py-2 bg-violet-600 hover:bg-violet-500 rounded-xl text-sm font-medium text-white transition-all">
+                  <Plus className="w-4 h-4" /><span className="hidden sm:inline">Create Event</span><span className="sm:hidden">New</span>
                 </button>
               </div>
             </div>
@@ -736,23 +738,25 @@ export default function CommunityPage({ user, onLogout }) {
         {/* ── GROUPS TAB ── */}
         {activeTab === 'groups' && (
           <div className="space-y-4">
-            <div className="flex flex-wrap gap-2 items-center justify-between">
+            <div className="space-y-2">
               <div className="flex gap-2 flex-wrap">
                 <input value={groups.filters.city} onChange={(e) => groups.setFilters((p) => ({ ...p, city: e.target.value }))}
                   placeholder="Filter by city…"
-                  className="bg-gray-900 border border-gray-800 rounded-xl px-4 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-violet-500 transition-colors w-40" />
+                  className="bg-gray-900 border border-gray-800 rounded-xl px-4 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-violet-500 transition-colors w-full sm:w-40" />
                 <select value={groups.filters.activity_focus} onChange={(e) => groups.setFilters((p) => ({ ...p, activity_focus: e.target.value }))}
-                  className="bg-gray-900 border border-gray-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-violet-500 transition-colors">
+                  className="bg-gray-900 border border-gray-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-violet-500 transition-colors w-full sm:w-auto">
                   <option value="">All activities</option>
                   {activityTypes.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
                 </select>
                 <input value={groups.filters.search} onChange={(e) => groups.setFilters((p) => ({ ...p, search: e.target.value }))}
                   placeholder="Search groups…"
-                  className="bg-gray-900 border border-gray-800 rounded-xl px-4 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-violet-500 transition-colors w-36" />
+                  className="bg-gray-900 border border-gray-800 rounded-xl px-4 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-violet-500 transition-colors w-full sm:w-40 flex-1" />
               </div>
-              <button onClick={() => setShowCreateGroup(true)} className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-500 rounded-xl text-sm font-medium text-white transition-all">
-                <Plus className="w-4 h-4" /> Create Group
-              </button>
+              <div className="flex justify-end">
+                <button onClick={() => setShowCreateGroup(true)} className="flex items-center gap-2 px-3 py-2 bg-violet-600 hover:bg-violet-500 rounded-xl text-sm font-medium text-white transition-all">
+                  <Plus className="w-4 h-4" /><span className="hidden sm:inline">Create Group</span><span className="sm:hidden">New</span>
+                </button>
+              </div>
             </div>
             {groups.loading
               ? <GridSkeleton />

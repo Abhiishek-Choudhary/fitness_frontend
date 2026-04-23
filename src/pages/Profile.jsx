@@ -13,6 +13,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../services/api.js';
 import AppNav from '../components/AppNav.jsx';
 import { usePayments } from '../hooks/usePayments.js';
+import { useAuth } from '../context/AuthContext.jsx';
 
 /* ─────────────────────────────────────────────
    Animated counter for welcome card stats
@@ -325,8 +326,9 @@ const ProfileFormModal = ({ onClose, onSaved, initialData }) => {
 /* ─────────────────────────────────────────────
    Main Profile Page
 ───────────────────────────────────────────── */
-const ProfilePage = ({ user: userProp, onLogout }) => {
+const ProfilePage = () => {
   const navigate = useNavigate();
+  const { user: userProp } = useAuth();
   const [mounted, setMounted] = useState(false);
 
   // Payment / subscription state (from hook)
@@ -434,10 +436,10 @@ const ProfilePage = ({ user: userProp, onLogout }) => {
       </div>
 
       {/* ── Navbar ── */}
-      <AppNav onLogout={onLogout} />
+      <AppNav />
 
       {/* ── Hero Banner ── */}
-      <div className="relative h-52 overflow-hidden">
+      <div className="relative h-36 md:h-52 overflow-hidden">
         <img
           src="https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=1400&h=500&fit=crop&q=80"
           alt="Fitness hero"
@@ -445,10 +447,10 @@ const ProfilePage = ({ user: userProp, onLogout }) => {
         />
         <div className="absolute inset-0 bg-gradient-to-r from-gray-950/90 via-gray-950/60 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-t from-gray-950 via-transparent to-transparent" />
-        <div className="absolute inset-0 flex flex-col justify-center px-6 md:px-10 max-w-7xl mx-auto">
+        <div className="absolute inset-0 flex flex-col justify-center px-4 md:px-10 max-w-7xl mx-auto">
           <p className="text-violet-400 text-xs font-semibold uppercase tracking-widest mb-1">Your Journey</p>
-          <h1 className="text-3xl md:text-4xl font-bold text-white">Fitness Dashboard</h1>
-          <p className="text-gray-300 text-sm mt-1.5">AI-powered plans tailored to your goals</p>
+          <h1 className="text-xl md:text-4xl font-bold text-white">Fitness Dashboard</h1>
+          <p className="text-gray-300 text-xs md:text-sm mt-1">AI-powered plans tailored to your goals</p>
         </div>
       </div>
 
@@ -461,7 +463,7 @@ const ProfilePage = ({ user: userProp, onLogout }) => {
         />
       )}
 
-      <div className="max-w-7xl mx-auto px-6 py-10 relative z-10 space-y-6">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-10 relative z-10 space-y-5 md:space-y-6">
 
         {/* ── Welcome Card ── */}
         <div className={`bg-gray-900 border border-gray-800 rounded-2xl p-6 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
