@@ -108,7 +108,7 @@ const api = {
 
   getAIPlanView: async () => {
     const response = await authFetch(`${API_BASE_URL}/fitness/ai-plan/view/`);
-
+    if (response.status === 404) return null; // no plan generated yet
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Fetching AI plan failed');
     return data;

@@ -984,9 +984,10 @@ const PricingSection = ({ plans, plansError, plansLoading, subscription, loading
   const currentTier  = subscription?.plan?.tier ?? 'free';
   const currentPlanId = subscription?.plan?.id ?? null;
 
-  const displayed = plans.filter(p =>
+  const filtered = plans.filter(p =>
     p.tier === 'free' || p.billing_cycle === cycle
   );
+  const displayed = filtered.length > 0 ? filtered : plans;
 
   return (
     <div className="pt-4">
@@ -1049,9 +1050,9 @@ const PricingSection = ({ plans, plansError, plansLoading, subscription, loading
             <p className="text-xs text-red-400/70 mt-0.5">{plansError}</p>
           </div>
         </div>
-      ) : displayed.length === 0 ? (
+      ) : plans.length === 0 ? (
         <div className="text-center py-10 text-gray-600 border border-dashed border-gray-800 rounded-2xl">
-          <p className="text-sm">No plans available at the moment. Check back soon.</p>
+          <p className="text-sm">No plans available at the moment. Add plans via the admin panel.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
