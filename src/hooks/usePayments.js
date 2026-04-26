@@ -4,6 +4,7 @@ import { loadRazorpayScript, openRazorpayCheckout } from '../utils/razorpay.js';
 
 export const usePayments = (user) => {
   const [plans, setPlans] = useState([]);
+  const [plansError, setPlansError] = useState(null);
   const [subscription, setSubscription] = useState(null);
   const [plansLoading, setPlansLoading] = useState(true);
   const [subscriptionLoading, setSubscriptionLoading] = useState(true);
@@ -26,8 +27,10 @@ export const usePayments = (user) => {
       try {
         const data = await api.getPlans();
         setPlans(data);
-      } catch {
+        setPlansError(null);
+      } catch (err) {
         setPlans([]);
+        setPlansError(err.message || 'Failed to load plans');
       } finally {
         setPlansLoading(false);
       }
@@ -85,6 +88,7 @@ export const usePayments = (user) => {
 
   return {
     plans,
+    plansError,
     subscription,
     plansLoading,
     subscriptionLoading,

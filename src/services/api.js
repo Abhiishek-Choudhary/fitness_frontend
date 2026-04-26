@@ -223,7 +223,7 @@ const api = {
       throw new Error(data.error || 'Fetching progress list failed');
     }
 
-    return data;
+    return Array.isArray(data) ? data : (data.results ?? []);
   },
 
   deleteProgress: async (progressId) => {
@@ -363,7 +363,7 @@ const api = {
     const response = await fetch(`${API_BASE_URL}/payments/plans/`);
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail || 'Failed to fetch plans');
-    return data;
+    return Array.isArray(data) ? data : (data.results ?? []);
   },
 
   createRazorpayOrder: async (planId) => {
@@ -397,7 +397,7 @@ const api = {
     const response = await authFetch(`${API_BASE_URL}/payments/history/`);
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail || 'Failed to fetch payment history');
-    return data;
+    return Array.isArray(data) ? data : (data.results ?? []);
   },
 
   /* ---------- FOOD LOGGING ---------- */

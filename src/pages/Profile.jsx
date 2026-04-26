@@ -333,7 +333,7 @@ const ProfilePage = () => {
 
   // Payment / subscription state (from hook)
   const {
-    plans, subscription, plansLoading, subscriptionLoading,
+    plans, plansError, subscription, plansLoading, subscriptionLoading,
     loadingPlanId, paymentStatus, clearPaymentStatus, purchase,
   } = usePayments(userProp);
 
@@ -354,7 +354,7 @@ const ProfilePage = () => {
     ? storedUser.username.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
     : 'Athlete';
 
-  /* ── On mount: fetch existing fitness profile ── */
+  /* ── On mount: fetch existing fitness profile + existing AI plan ── */
   useEffect(() => {
     setMounted(true);
     (async () => {
@@ -362,10 +362,19 @@ const ProfilePage = () => {
         const data = await api.getFitnessProfile();
         setProfile(data);
       } catch {
-        // 404 = no profile yet — that's fine
         setProfile(null);
       } finally {
         setProfileLoading(false);
+      }
+
+      try {
+        const plan = await api.getAIPlanView();
+        if (plan && (plan.weekly_workout_plan || plan.daily_calories || plan.parsed_data)) {
+          setAiResult(plan);
+          setAiStep('done');
+        }
+      } catch {
+        // No existing plan yet — that's fine
       }
     })();
   }, []);
@@ -678,6 +687,7 @@ const ProfilePage = () => {
         <div id="pricing-section">
           <PricingSection
             plans={plans}
+            plansError={plansError}
             plansLoading={plansLoading}
             subscription={subscription}
             loadingPlanId={loadingPlanId}
@@ -968,7 +978,7 @@ const PlanCard = ({ plan, isCurrent, isHigherTier, isLoading, anyLoading, onPurc
 /* ─────────────────────────────────────────────
    Pricing Section
 ───────────────────────────────────────────── */
-const PricingSection = ({ plans, plansLoading, subscription, loadingPlanId, paymentStatus, onClearStatus, onPurchase }) => {
+const PricingSection = ({ plans, plansError, plansLoading, subscription, loadingPlanId, paymentStatus, onClearStatus, onPurchase }) => {
   const [cycle, setCycle] = useState('monthly');
 
   const currentTier  = subscription?.plan?.tier ?? 'free';
@@ -1030,6 +1040,18 @@ const PricingSection = ({ plans, plansLoading, subscription, loadingPlanId, paym
               </div>
             </div>
           ))}
+        </div>
+      ) : plansError ? (
+        <div className="flex items-start gap-3 bg-red-500/10 border border-red-500/20 rounded-2xl p-5">
+          <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-red-300">Could not load plans</p>
+            <p className="text-xs text-red-400/70 mt-0.5">{plansError}</p>
+          </div>
+        </div>
+      ) : displayed.length === 0 ? (
+        <div className="text-center py-10 text-gray-600 border border-dashed border-gray-800 rounded-2xl">
+          <p className="text-sm">No plans available at the moment. Check back soon.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
