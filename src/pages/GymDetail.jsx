@@ -2,8 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Building2, MapPin, Phone, Mail, Globe, Users, BadgeCheck, Heart,
-  Send, ChevronLeft, Loader2, AlertCircle, Clock, Wifi, Star,
-  Image as ImageIcon, X, Upload, Settings, Megaphone,
+  Send, ChevronLeft, Loader2, AlertCircle, Clock, Star,
+  Image as ImageIcon, Settings, Megaphone, Dumbbell,
 } from 'lucide-react';
 import AppNav from '../components/AppNav.jsx';
 import api from '../services/api.js';

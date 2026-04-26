@@ -204,7 +204,7 @@ export default function GymRegister() {
       fd.append('opening_hours', JSON.stringify(
         Object.fromEntries(
           Object.entries(form.opening_hours).map(([day, val]) =>
-            [day, val.open ? { from: val.from, to: val.to } : 'closed']
+            [day, val.open ? { open: val.from, close: val.to } : null]
           )
         )
       ));
