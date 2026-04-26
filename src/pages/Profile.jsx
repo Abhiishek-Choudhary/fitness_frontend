@@ -796,7 +796,7 @@ const CurrentPlanSection = ({ subscription, loading }) => {
         <div className="bg-gray-950 border border-gray-800 rounded-xl px-4 py-3">
           <p className="text-xs text-gray-600 mb-0.5">Price</p>
           <p className="text-sm font-semibold text-white">
-            {plan?.price_inr === 0 ? 'Free forever' : `₹${plan?.price_inr}/${plan?.billing_cycle === 'yearly' ? 'yr' : 'mo'}`}
+            {plan?.price_paise === 0 ? 'Free forever' : `₹${(plan?.price_paise ?? 0) / 100}/${plan?.billing_cycle === 'yearly' ? 'yr' : 'mo'}`}
           </p>
         </div>
         <div className="bg-gray-950 border border-gray-800 rounded-xl px-4 py-3">
@@ -864,7 +864,7 @@ const CurrentPlanSection = ({ subscription, loading }) => {
                     </p>
                   </div>
                   <div className="flex items-center gap-3 flex-shrink-0">
-                    <span className="text-white font-semibold">₹{item.amount_inr}</span>
+                    <span className="text-white font-semibold">₹{item.amount_inr ?? (item.amount_paise != null ? item.amount_paise / 100 : item.amount ?? '—')}</span>
                     <span className={`text-xs px-2 py-0.5 rounded-full ${
                       item.status === 'captured'
                         ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
@@ -938,16 +938,16 @@ const PlanCard = ({ plan, isCurrent, isHigherTier, isLoading, anyLoading, onPurc
         </div>
         <p className="text-xs text-gray-500 mb-4">{plan.description}</p>
         <div className="flex items-baseline gap-1">
-          {plan.price_inr === 0 ? (
+          {plan.price_paise === 0 ? (
             <span className="text-4xl font-bold text-white">Free</span>
           ) : (
             <>
-              <span className="text-4xl font-bold text-white">₹{plan.price_inr}</span>
+              <span className="text-4xl font-bold text-white">₹{plan.price_paise / 100}</span>
               <span className="text-gray-500 text-sm">/{plan.billing_cycle === 'yearly' ? 'yr' : 'mo'}</span>
             </>
           )}
         </div>
-        {plan.billing_cycle === 'yearly' && plan.price_inr > 0 && (
+        {plan.billing_cycle === 'yearly' && plan.price_paise > 0 && (
           <p className="text-xs text-emerald-400 mt-1 font-medium">Save 25% vs monthly</p>
         )}
       </div>
