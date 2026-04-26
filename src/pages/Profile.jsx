@@ -410,14 +410,12 @@ const ProfilePage = () => {
 
       // Step 3: POST /api/fitness/ai-plan/
       setAiStep('generating');
-      await api.generateAIPlan({
+      const generated = await api.generateAIPlan({
         prompt: parsed.prompt,
         parsed_data: parsed.parsed_data,
       });
 
-      // Fetch the saved plan for display
-      const planView = await api.getAIPlanView();
-      setAiResult(planView);
+      setAiResult(generated.ai_plan ?? generated);
       setAiStep('done');
 
     } catch (err) {
