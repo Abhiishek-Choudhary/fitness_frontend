@@ -22,26 +22,86 @@ const useCounter = (target, active) => {
   return val;
 };
 
-/* ── macro card ── */
-const MacroCard = ({ icon: Icon, label, value, unit, gradient, textColor, delay }) => {
+/* ── daily nutrition targets ── */
+const KCAL_PER_GRAM = { protein: 4, carbs: 4, fats: 9 };
+
+const MacroStat = ({ label, grams, percent, icon: Icon, text, delay }) => {
   const [show, setShow] = useState(false);
-  const count = useCounter(value, show);
+  const count = useCounter(grams, show);
   useEffect(() => { const t = setTimeout(() => setShow(true), delay); return () => clearTimeout(t); }, [delay]);
 
   return (
-    <div className={`relative bg-gray-900 border border-gray-800 rounded-2xl p-5 overflow-hidden
-      transition-all duration-700 hover:border-gray-700 hover:shadow-lg hover:shadow-black/30
-      ${show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
+    <div className={`bg-gray-950/40 border border-gray-800 rounded-xl p-3 sm:p-4 transition-all duration-700
+      ${show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'}`}
     >
-      <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-5 pointer-events-none`} />
-      <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${gradient} bg-opacity-10 flex items-center justify-center mb-3 shadow-inner`}>
-        <Icon className={`w-5 h-5 ${textColor}`} />
+      <div className="flex items-center gap-1.5 mb-1.5">
+        <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${text}`} />
+        <p className="text-[10px] sm:text-[11px] text-gray-500 uppercase tracking-wider font-medium truncate">{label}</p>
       </div>
-      <p className="text-[11px] text-gray-500 uppercase tracking-widest mb-1 font-medium">{label}</p>
-      <p className={`text-3xl font-extrabold ${textColor}`}>
-        {count}
-        <span className="text-sm text-gray-500 font-normal ml-1">{unit}</span>
+      <p className="flex items-baseline gap-1">
+        <span className={`text-xl sm:text-2xl font-bold tabular-nums ${text}`}>{count}</span>
+        <span className="text-xs text-gray-500">g</span>
       </p>
+      <p className="text-[10px] text-gray-600 mt-0.5 tabular-nums">{Math.round(percent)}% of kcal</p>
+    </div>
+  );
+};
+
+const NutritionTargets = ({ calories, macros }) => {
+  const [show, setShow] = useState(false);
+  const count = useCounter(calories, show);
+  useEffect(() => { const t = setTimeout(() => setShow(true), 50); return () => clearTimeout(t); }, []);
+
+  const macroKcal = macros.reduce((sum, m) => sum + m.kcal, 0);
+  const share = (m) => (macroKcal ? (m.kcal / macroKcal) * 100 : 0);
+
+  return (
+    <div className={`transition-all duration-700 ${show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+      <div className="flex items-center gap-2 mb-3">
+        <Flame className="w-4 h-4 text-orange-400" />
+        <p className="text-xs text-gray-500 uppercase tracking-widest font-semibold">Daily Nutrition Targets</p>
+      </div>
+
+      <div className="relative bg-gray-900 border border-gray-800 rounded-2xl p-4 sm:p-5 overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-orange-500/[0.07] via-transparent to-violet-500/[0.07] pointer-events-none" />
+
+        <div className="relative flex items-end justify-between gap-3 flex-wrap">
+          <div>
+            <p className="text-[11px] text-gray-500 uppercase tracking-widest font-medium mb-1">Calorie target</p>
+            <p className="flex items-baseline gap-1.5">
+              <span className="text-4xl sm:text-5xl font-extrabold text-white tabular-nums">
+                {calories == null ? '—' : count}
+              </span>
+              <span className="text-sm text-gray-500 font-medium">kcal / day</span>
+            </p>
+          </div>
+          {macroKcal > 0 && (
+            <p className="text-[11px] text-gray-500 tabular-nums">
+              {macros.map((m) => `${Math.round(share(m))}% ${m.short}`).join(' · ')}
+            </p>
+          )}
+        </div>
+
+        {macroKcal > 0 && (
+          <div className="relative mt-4 flex h-2 rounded-full overflow-hidden bg-gray-800">
+            {macros.map((m) => (
+              <div
+                key={m.key}
+                className={`${m.bar} transition-[width] duration-1000 ease-out`}
+                style={{ width: show ? `${share(m)}%` : '0%' }}
+              />
+            ))}
+          </div>
+        )}
+
+        {macros.length > 0 && (
+          <div className="relative grid grid-cols-3 gap-2 sm:gap-3 mt-4">
+            {macros.map((m, i) => (
+              <MacroStat key={m.key} {...m} percent={share(m)} delay={150 + i * 100} />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
@@ -144,24 +204,23 @@ const AIPlanCard = ({ plan }) => {
   const foodsToAvoid = plan.foods_to_avoid ?? [];
   const safetyNotes  = plan.safety_notes ?? [];
 
-  const macroCards = [
-    { icon: Flame,    label: 'Daily Calories',  value: plan.daily_calories, unit: 'kcal', gradient: 'from-orange-500 to-red-500',   textColor: 'text-orange-400', delay: 0   },
-    { icon: Beef,     label: 'Protein',          value: protein,             unit: 'g',    gradient: 'from-red-500 to-pink-500',     textColor: 'text-red-400',    delay: 100 },
-    { icon: Wheat,    label: 'Carbohydrates',    value: carbs,               unit: 'g',    gradient: 'from-amber-500 to-yellow-500', textColor: 'text-amber-400',  delay: 200 },
-    { icon: Droplets, label: 'Fats',             value: fats,                unit: 'g',    gradient: 'from-blue-500 to-cyan-500',    textColor: 'text-blue-400',   delay: 300 },
-  ].filter(m => m.value != null);
+  const calories = Number.isFinite(Number(plan.daily_calories)) ? Number(plan.daily_calories) : null;
+
+  const macroList = [
+    { key: 'protein', label: 'Protein', short: 'P', grams: protein, icon: Beef,     bar: 'bg-red-500',   text: 'text-red-400'   },
+    { key: 'carbs',   label: 'Carbs',   short: 'C', grams: carbs,   icon: Wheat,    bar: 'bg-amber-500', text: 'text-amber-400' },
+    { key: 'fats',    label: 'Fats',    short: 'F', grams: fats,    icon: Droplets, bar: 'bg-blue-500',  text: 'text-blue-400'  },
+  ]
+    .map(m => ({ ...m, grams: Number(m.grams) }))
+    .filter(m => Number.isFinite(m.grams))
+    .map(m => ({ ...m, kcal: m.grams * KCAL_PER_GRAM[m.key] }));
 
   return (
     <div className="space-y-8">
 
       {/* ── Macro targets ── */}
-      {macroCards.length > 0 && (
-        <div>
-          <p className="text-xs text-gray-500 uppercase tracking-widest mb-4 font-semibold">Daily Nutrition Targets</p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {macroCards.map(m => <MacroCard key={m.label} {...m} />)}
-          </div>
-        </div>
+      {(calories != null || macroList.length > 0) && (
+        <NutritionTargets calories={calories} macros={macroList} />
       )}
 
       {/* ── Weekly Workout Plan ── */}
