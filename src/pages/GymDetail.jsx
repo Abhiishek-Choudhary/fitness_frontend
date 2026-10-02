@@ -235,7 +235,7 @@ export default function GymDetail() {
     { id: 'about',     label: 'About' },
     { id: 'gallery',   label: `Gallery${gym.media?.length ? ` (${gym.media.length})` : ''}` },
     { id: 'messages',  label: 'Messages' },
-    { id: 'campaigns', label: 'Updates' },
+    ...(isOwner ? [{ id: 'campaigns', label: 'Updates' }] : []),
   ];
 
   return (

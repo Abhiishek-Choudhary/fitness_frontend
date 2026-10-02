@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   Heart, Bookmark, MessageCircle, Play, TrendingUp, Flame, Users,
   Sparkles, Send, Trash2, UserPlus, UserCheck, Tag,
-  AlertCircle, Loader2, RefreshCw, LayoutGrid, List,
+  AlertCircle, Loader2, RefreshCw, LayoutGrid, List, BadgeCheck,
 } from 'lucide-react';
 import AppNav from '../components/AppNav.jsx';
 import { useFeed } from '../hooks/useFeed.js';
@@ -150,7 +150,9 @@ function PostCard({ post, user, onLike, onSave, onFollow, followedCreators }) {
   const [showComments, setShowComments] = useState(false);
   const [showVideo, setShowVideo]       = useState(false);
 
-  const vid      = ytId(post.youtube_url ?? post.video_url);
+  const vid      = post.youtube_video_id || ytId(post.video_url);
+  const embedSrc = post.embed_url || (vid ? `https://www.youtube.com/embed/${vid}` : null);
+  const thumbSrc = post.thumbnail_url || (vid ? `https://img.youtube.com/vi/${vid}/hqdefault.jpg` : null);
   const creator  = post.creator ?? post.author ?? {};
   const cname    = creator.username ?? '';
   const isFollow = followedCreators instanceof Set && followedCreators.has(cname);
@@ -164,11 +166,11 @@ function PostCard({ post, user, onLike, onSave, onFollow, followedCreators }) {
       {/* Thumbnail / embed */}
       <div
         className="relative overflow-hidden cursor-pointer bg-gray-800"
-        onClick={() => vid && setShowVideo((v) => !v)}
+        onClick={() => embedSrc && setShowVideo((v) => !v)}
       >
-        {showVideo && vid ? (
+        {showVideo && embedSrc ? (
           <iframe
-            src={`https://www.youtube.com/embed/${vid}?autoplay=1`}
+            src={`${embedSrc}${embedSrc.includes('?') ? '&' : '?'}autoplay=1`}
             className="w-full aspect-video"
             allow="autoplay; encrypted-media"
             allowFullScreen
@@ -176,9 +178,9 @@ function PostCard({ post, user, onLike, onSave, onFollow, followedCreators }) {
           />
         ) : (
           <div className="w-full aspect-video relative overflow-hidden">
-            {vid ? (
+            {thumbSrc ? (
               <img
-                src={`https://img.youtube.com/vi/${vid}/hqdefault.jpg`}
+                src={thumbSrc}
                 alt={post.title ?? ''}
                 className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
                 loading="lazy"
@@ -188,7 +190,7 @@ function PostCard({ post, user, onLike, onSave, onFollow, followedCreators }) {
                 <Play className="w-10 h-10 text-gray-600" />
               </div>
             )}
-            {vid && (
+            {embedSrc && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
                 <div className="w-12 h-12 rounded-full bg-red-600/90 flex items-center justify-center shadow-xl">
                   <Play className="w-5 h-5 text-white ml-0.5" />
@@ -226,14 +228,15 @@ function PostCard({ post, user, onLike, onSave, onFollow, followedCreators }) {
         {/* Creator */}
         <div className="flex items-center gap-2 mt-auto pt-2">
           <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-600 to-purple-700 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-            {avatar(creator.display_name ?? cname)}
+            {avatar(creator.name || cname)}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-gray-300 truncate">
-              {creator.display_name ?? cname ?? 'Creator'}
+            <p className="text-xs font-semibold text-gray-300 truncate flex items-center gap-1">
+              <span className="truncate">{creator.name || cname || 'Creator'}</span>
+              {creator.is_verified && <BadgeCheck className="w-3 h-3 text-violet-400 flex-shrink-0" />}
             </p>
-            {creator.followers_count != null && (
-              <p className="text-[10px] text-gray-600">{Number(creator.followers_count).toLocaleString()} followers</p>
+            {creator.specialization && (
+              <p className="text-[10px] text-gray-600 truncate">{creator.specialization}</p>
             )}
           </div>
           {user && cname && (

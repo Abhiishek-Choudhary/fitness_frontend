@@ -27,6 +27,25 @@ const TAB_BANNERS = {
   },
 };
 
+const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'];
+
+const defaultMealType = () => {
+  const hour = new Date().getHours();
+  if (hour < 11) return 'breakfast';
+  if (hour < 16) return 'lunch';
+  if (hour < 22) return 'dinner';
+  return 'snack';
+};
+
+const todayISO = () => new Date().toLocaleDateString('en-CA');
+
+// The workout API returns watch URLs, which YouTube refuses to render in an iframe.
+const toEmbedUrl = (url) => {
+  if (!url) return null;
+  const id = url.match(/[?&]v=([\w-]{11})/)?.[1] ?? url.match(/youtu\.be\/([\w-]{11})/)?.[1];
+  return id ? `https://www.youtube.com/embed/${id}` : url;
+};
+
 const TabBanner = ({ tab }) => {
   const { url, title, subtitle } = TAB_BANNERS[tab] ?? {};
   if (!url) return null;
@@ -93,6 +112,7 @@ export default function FitnessTracker() {
   const [calorieError, setCalorieError] = useState('');
   const [savingToLog, setSavingToLog] = useState(false);
   const [savedToLog, setSavedToLog] = useState(false);
+  const [mealType, setMealType] = useState(defaultMealType);
 
   // Posture AI state
   const [postureImages, setPostureImages] = useState([]);
@@ -212,17 +232,20 @@ export default function FitnessTracker() {
 
   /* ── Save calorie result to food log ── */
   const handleSaveToLog = async () => {
-    if (!calorieResult) return;
+    const items = calorieResult?.items ?? [];
+    if (!items.length) return;
     setSavingToLog(true);
+    setCalorieError('');
     try {
-      const entry = {
-        food_name: calorieResult.food_name || calorieResult.food || calorieResult.detected_food || 'Analyzed meal',
-        calories:  Number(calorieResult.calories ?? calorieResult.total_calories ?? 0),
-        protein:   Number(calorieResult.protein  ?? calorieResult.protein_g ?? 0),
-        carbs:     Number(calorieResult.carbs     ?? calorieResult.carbohydrates ?? calorieResult.carbs_g ?? 0),
-        fat:       Number(calorieResult.fat       ?? calorieResult.fats ?? calorieResult.fat_g ?? 0),
-      };
-      await api.bulkSaveFoodLog({ entries: [entry] });
+      await api.bulkSaveFoodLog({
+        items: items.map((item) => ({
+          name: item.name,
+          calories: Number(item.calories ?? 0),
+          quantity: item.quantity ?? '',
+        })),
+        meal_type: mealType,
+        logged_on: todayISO(),
+      });
       setSavedToLog(true);
     } catch (err) {
       setCalorieError(err.message || 'Failed to save to food log.');
@@ -260,10 +283,7 @@ export default function FitnessTracker() {
 
       if (!sessionId && sessionId !== 0) {
         console.error('Upload response:', uploadResult);
-        throw new Error(
-          `Upload succeeded but no session ID was found in the response. ` +
-          `Got keys: ${Object.keys(uploadResult).join(', ')}`
-        );
+        throw new Error('Could not start the analysis. Please try again.');
       }
 
       setPostureUploading(false);
@@ -288,22 +308,25 @@ export default function FitnessTracker() {
     try {
       const result = await api.getEnrichedWorkout({ prompt: aiPrompt });
 
-      // Backend returns enriched workout with YouTube links per exercise
-      const exercises = (result.exercises || result.workout || []).map((ex, idx) => ({
-        name: ex.name || ex.exercise || `Exercise ${idx + 1}`,
-        sets: ex.sets || 3,
-        reps: ex.reps || 10,
-        rest: ex.rest || ex.rest_time || '60s',
-        video: ex.youtube_url || ex.video_url || null,
-        description: ex.description || '',
-        muscles: ex.muscles || ex.muscle_groups || '',
-      }));
+      const days = result.weekly_workout_plan ?? [];
+      if (!days.length) {
+        throw new Error('Generate a plan from your profile first — this adds videos to an existing plan.');
+      }
+
+      const exercises = days.flatMap((day) =>
+        (day.exercises ?? []).map((ex) => ({
+          name: ex.display_name,
+          sets_reps: ex.sets_reps,
+          video: toEmbedUrl(ex.videos?.[0]?.url),
+          day: day.day,
+        }))
+      );
 
       const newWorkout = {
         id: workouts.length + 1,
-        name: result.name || result.workout_name || aiPrompt,
+        name: aiPrompt,
         exercises,
-        duration: result.duration || result.total_duration || 30,
+        duration: days.reduce((sum, d) => sum + (d.duration_minutes ?? 0), 0),
         completed: false,
       };
       setWorkouts([...workouts, newWorkout]);
@@ -450,7 +473,7 @@ export default function FitnessTracker() {
                   ) : (
                     <Plus className="w-4 h-4" />
                   )}
-                  {generatingWorkout ? 'Generating...' : 'Generate'}
+                  {generatingWorkout ? 'Building your workout…' : 'Generate'}
                 </button>
               </div>
               {workoutError && (
@@ -515,11 +538,20 @@ export default function FitnessTracker() {
                             </button>
                           </div>
                           <div className="flex gap-3 text-xs text-gray-500">
-                            <span>{exercise.sets} sets</span>
-                            <span>·</span>
-                            <span>{exercise.reps} reps</span>
-                            <span>·</span>
-                            <span>{exercise.rest} rest</span>
+                            {exercise.sets_reps ? (
+                              <>
+                                <span>{exercise.sets_reps}</span>
+                                {exercise.day && <><span>·</span><span>{exercise.day}</span></>}
+                              </>
+                            ) : (
+                              <>
+                                <span>{exercise.sets} sets</span>
+                                <span>·</span>
+                                <span>{exercise.reps} reps</span>
+                                <span>·</span>
+                                <span>{exercise.rest} rest</span>
+                              </>
+                            )}
                           </div>
 
                           {selectedExercise === exercise.name && (
@@ -672,37 +704,29 @@ export default function FitnessTracker() {
                     </div>
                   </div>
 
-                  {(postureAnalysis.feedback || postureAnalysis.analysis || []).length > 0 && (
-                    <div className="space-y-2">
-                      <p className="text-sm font-semibold text-white">Detailed Feedback</p>
-                      {(postureAnalysis.feedback || postureAnalysis.analysis).map((item, idx) => {
-                        const isGood = item.status === 'good' || item.rating === 'good' || item.score >= 70;
-                        return (
-                          <div
-                            key={idx}
-                            className={`p-3 rounded-xl border flex items-start gap-3 ${
-                              isGood ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-yellow-500/5 border-yellow-500/20'
-                            }`}
-                          >
-                            {isGood ? (
-                              <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
-                            ) : (
-                              <XCircle className="w-4 h-4 text-yellow-400 flex-shrink-0 mt-0.5" />
-                            )}
-                            <div>
-                              <p className="text-sm font-medium text-white">{item.aspect || item.category || item.label}</p>
-                              <p className="text-xs text-gray-500 mt-0.5">{item.message || item.feedback || item.comment}</p>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-white">What We Spotted</p>
+                    {(postureAnalysis.feedback?.issues ?? []).length > 0 ? (
+                      postureAnalysis.feedback.issues.map((issue, idx) => (
+                        <div key={idx} className="p-3 rounded-xl border bg-yellow-500/5 border-yellow-500/20 flex items-start gap-3">
+                          <XCircle className="w-4 h-4 text-yellow-400 flex-shrink-0 mt-0.5" />
+                          <p className="text-sm font-medium text-white">{issue}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="p-3 rounded-xl border bg-emerald-500/5 border-emerald-500/20 flex items-start gap-3">
+                        <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+                        <p className="text-sm font-medium text-white">No form issues detected — nice work.</p>
+                      </div>
+                    )}
+                  </div>
 
-                  {postureAnalysis.summary && (
+                  {postureAnalysis.feedback?.ai_feedback && (
                     <div className="bg-gray-950 rounded-xl p-4 border border-gray-800">
-                      <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">AI Summary</p>
-                      <p className="text-sm text-gray-300 leading-relaxed">{postureAnalysis.summary}</p>
+                      <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">Coach Notes</p>
+                      <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-line">
+                        {postureAnalysis.feedback.ai_feedback}
+                      </p>
                     </div>
                   )}
 
@@ -759,7 +783,10 @@ export default function FitnessTracker() {
               {analyzing && (
                 <div className="mt-4 flex items-center justify-center gap-3 py-4">
                   <div className="w-5 h-5 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
-                  <span className="text-sm text-gray-400">Analyzing your meal with AI...</span>
+                  <div>
+                    <p className="text-sm text-gray-300">Analyzing your meal with AI…</p>
+                    <p className="text-xs text-gray-600 mt-0.5">This can take up to a minute at busy times.</p>
+                  </div>
                 </div>
               )}
 
@@ -774,41 +801,56 @@ export default function FitnessTracker() {
               {/* Real result from API */}
               {calorieResult && !analyzing && (
                 <div className="mt-4 bg-gray-950 border border-gray-800 rounded-xl p-4 space-y-4 animate-fade-in">
-                  <div>
-                    <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Detected Food</p>
-                    <p className="text-white font-semibold text-base">
-                      {calorieResult.food_name || calorieResult.food || calorieResult.detected_food || 'Unknown food'}
+                  <div className="text-center">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Estimated Total</p>
+                    <p className="text-4xl font-bold text-orange-400">
+                      {calorieResult.total_calories ?? '—'}
+                      <span className="text-xl text-gray-600 ml-1">kcal</span>
                     </p>
-                    {calorieResult.description && (
-                      <p className="text-xs text-gray-500 mt-1">{calorieResult.description}</p>
-                    )}
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-                    {[
-                      { label: 'Calories', value: calorieResult.calories ?? calorieResult.total_calories, unit: 'kcal', color: 'text-orange-400' },
-                      { label: 'Protein', value: calorieResult.protein ?? calorieResult.protein_g, unit: 'g', color: 'text-blue-400' },
-                      { label: 'Carbs', value: calorieResult.carbs ?? calorieResult.carbohydrates ?? calorieResult.carbs_g, unit: 'g', color: 'text-violet-400' },
-                      { label: 'Fat', value: calorieResult.fat ?? calorieResult.fats ?? calorieResult.fat_g, unit: 'g', color: 'text-yellow-400' },
-                    ].map(({ label, value, unit, color }) => value != null && (
-                      <div key={label} className="bg-gray-900 rounded-lg p-3 border border-gray-800 text-center">
-                        <p className={`text-xl font-bold ${color}`}>{value}</p>
-                        <p className="text-xs text-gray-500">{unit}</p>
-                        <p className="text-xs text-gray-600 mt-0.5">{label}</p>
-                      </div>
-                    ))}
+                  {(calorieResult.items ?? []).length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-xs text-gray-500 uppercase tracking-wide">Detected Items</p>
+                      {calorieResult.items.map((item, idx) => (
+                        <div key={idx} className="flex items-center justify-between gap-3 bg-gray-900 border border-gray-800 rounded-lg px-3 py-2">
+                          <div className="min-w-0">
+                            <p className="text-sm text-white capitalize truncate">{item.name}</p>
+                            {item.quantity && <p className="text-xs text-gray-500">{item.quantity}</p>}
+                          </div>
+                          <p className="text-sm font-semibold text-orange-400 flex-shrink-0">{item.calories} kcal</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">Log as</p>
+                    <div className="flex bg-gray-900 border border-gray-800 rounded-xl p-1 gap-1">
+                      {MEAL_TYPES.map((m) => (
+                        <button
+                          key={m}
+                          onClick={() => { setMealType(m); setSavedToLog(false); }}
+                          className={`flex-1 py-1.5 rounded-lg text-xs font-medium capitalize transition-all ${
+                            mealType === m ? 'bg-violet-600 text-white' : 'text-gray-500 hover:text-gray-300'
+                          }`}
+                        >
+                          {m}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
-                  {calorieResult.notes && (
+                  {calorieResult.note && (
                     <p className="text-xs text-gray-500 leading-relaxed border-t border-gray-800 pt-3">
-                      {calorieResult.notes}
+                      {calorieResult.note}
                     </p>
                   )}
 
                   <div className="flex gap-2 pt-1">
                     <button
                       onClick={handleSaveToLog}
-                      disabled={savingToLog || savedToLog}
+                      disabled={savingToLog || savedToLog || !(calorieResult.items ?? []).length}
                       className={`flex-1 py-2 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-1.5 ${
                         savedToLog
                           ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 cursor-default'

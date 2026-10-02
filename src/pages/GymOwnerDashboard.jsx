@@ -421,12 +421,12 @@ function MembersTab({ gym }) {
       <div className="w-9 h-9 rounded-full bg-violet-600/20 border border-violet-500/30 flex items-center justify-center flex-shrink-0">
         {u.avatar
           ? <img src={u.avatar} alt="" className="w-full h-full rounded-full object-cover" />
-          : <span className="text-sm font-semibold text-violet-300">{(u.username || u.name || 'U')[0].toUpperCase()}</span>
+          : <span className="text-sm font-semibold text-violet-300">{(u.name || u.username || 'U')[0].toUpperCase()}</span>
         }
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-white truncate">{u.username || u.name || `User ${u.id}`}</p>
-        {u.email && <p className="text-xs text-gray-500 truncate">{u.email}</p>}
+        <p className="text-sm font-medium text-white truncate">{u.name || u.username || `User ${u.id}`}</p>
+        {u.name && u.username && <p className="text-xs text-gray-500 truncate">@{u.username}</p>}
       </div>
       <div className="flex items-center gap-2 flex-shrink-0">
         {u.membership_status === 'member'

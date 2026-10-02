@@ -2,23 +2,54 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000/api';
 const BASE_URL = import.meta.env.VITE_BASE_URL ?? 'http://127.0.0.1:8000';
 
-/* ---------------- AUTH FETCH WRAPPER ---------------- */
-const authFetch = async (url, options = {}) => {
-  let accessToken = localStorage.getItem('access_token');
+export const SESSION_EXPIRED_EVENT = 'auth:session-expired';
+const SIGN_IN_REQUIRED_MESSAGE = 'Please sign in to continue.';
+const TIMEOUT_MESSAGE = 'That took longer than expected. Please try again.';
 
-  const headers = {
+// AI calls fall back across backends when one is out of quota, and the delay is
+// additive — so this sits well above the 90s floor the API contract asks for.
+const AI_TIMEOUT_MS = 120000;
+
+const sessionExpiredError = () => {
+  localStorage.clear();
+  window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+  return new Error('Your session expired. Please sign in again.');
+};
+
+/* ---------------- AUTH FETCH WRAPPER ---------------- */
+const authFetch = async (url, { timeoutMs = 0, ...options } = {}) => {
+  const accessToken = localStorage.getItem('access_token');
+  if (!accessToken) throw new Error(SIGN_IN_REQUIRED_MESSAGE);
+
+  const buildHeaders = (token) => ({
     // Skip Content-Type for FormData — browser sets it (with boundary)
     ...(!(options.body instanceof FormData) && { 'Content-Type': 'application/json' }),
-    ...(accessToken && { Authorization: `Bearer ${accessToken}` }),
+    Authorization: `Bearer ${token}`,
     ...options.headers,
+  });
+
+  const send = async (token) => {
+    const headers = buildHeaders(token);
+    if (!timeoutMs) return fetch(url, { ...options, headers });
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(url, { ...options, headers, signal: controller.signal });
+    } catch (err) {
+      if (err.name === 'AbortError') throw new Error(TIMEOUT_MESSAGE);
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
   };
 
-  let response = await fetch(url, { ...options, headers });
+  let response = await send(accessToken);
 
   /* 🔁 If token expired, refresh & retry once */
   if (response.status === 401) {
     const refreshToken = localStorage.getItem('refresh_token');
-    if (!refreshToken) throw new Error('Session expired. Please login again.');
+    if (!refreshToken) throw sessionExpiredError();
 
     const refreshResponse = await fetch(
       `${API_BASE_URL}/accounts/token/refresh/`,
@@ -29,17 +60,13 @@ const authFetch = async (url, options = {}) => {
       }
     );
 
-    if (!refreshResponse.ok) {
-      localStorage.clear();
-      throw new Error('Session expired. Please login again.');
-    }
+    if (!refreshResponse.ok) throw sessionExpiredError();
 
     const refreshData = await refreshResponse.json();
     localStorage.setItem('access_token', refreshData.access);
 
-    // retry original request
-    headers.Authorization = `Bearer ${refreshData.access}`;
-    response = await fetch(url, { ...options, headers });
+    response = await send(refreshData.access);
+    if (response.status === 401) throw sessionExpiredError();
   }
 
   return response;
@@ -88,6 +115,7 @@ const api = {
     const response = await authFetch(`${API_BASE_URL}/fitness/prompt/`, {
       method: 'POST',
       body: JSON.stringify({ prompt }),
+      timeoutMs: AI_TIMEOUT_MS,
     });
 
     const data = await response.json();
@@ -99,6 +127,7 @@ const api = {
     const response = await authFetch(`${API_BASE_URL}/fitness/ai-plan/`, {
       method: 'POST',
       body: JSON.stringify(payload),
+      timeoutMs: AI_TIMEOUT_MS,
     });
 
     const data = await response.json();
@@ -309,16 +338,17 @@ const api = {
   /* ---------- CALORIE AI ---------- */
 
   /**
-   * POST /api/calories/estimate/  (Public, 30/hr)
+   * POST /api/calories/estimate/  (Auth required, 30/hr)
    * Body: FormData { image: File }
    * Response: { food_name, calories, protein, carbs, fat, ... }
    */
   estimateCalories: async (imageFile) => {
     const formData = new FormData();
     formData.append('image', imageFile);
-    const response = await fetch(`${API_BASE_URL}/calories/estimate/`, {
+    const response = await authFetch(`${API_BASE_URL}/calories/estimate/`, {
       method: 'POST',
       body: formData,
+      timeoutMs: AI_TIMEOUT_MS,
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || data.detail || 'Calorie estimation failed');
@@ -328,14 +358,14 @@ const api = {
   /* ---------- POSTURE AI ---------- */
 
   /**
-   * POST /posture/pushup/upload/  (Public, 30/hr)
+   * POST /posture/pushup/upload/  (Auth required, 30/hr)
    * Body: FormData { images: File[] }  — 3 or more push-up images
    * Response: { session_id: "..." }
    */
   uploadPostureImages: async (imageFiles) => {
     const formData = new FormData();
     Array.from(imageFiles).forEach((file) => formData.append('images', file));
-    const response = await fetch(`${BASE_URL}/posture/pushup/upload/`, {
+    const response = await authFetch(`${BASE_URL}/posture/pushup/upload/`, {
       method: 'POST',
       body: formData,
     });
@@ -345,12 +375,13 @@ const api = {
   },
 
   /**
-   * POST /posture/analyze/<session_id>/  (Public, 30/hr)
+   * POST /posture/analyze/<session_id>/  (Auth required, 30/hr)
    * Response: { score: number, feedback: [...] }
    */
   analyzePosture: async (sessionId) => {
-    const response = await fetch(`${BASE_URL}/posture/analyze/${sessionId}/`, {
+    const response = await authFetch(`${BASE_URL}/posture/analyze/${sessionId}/`, {
       method: 'POST',
+      timeoutMs: AI_TIMEOUT_MS,
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || data.detail || 'Posture analysis failed');
@@ -420,10 +451,11 @@ const api = {
     return data;
   },
 
-  bulkSaveFoodLog: async (entries) => {
+  /** Body: { items: [{ name, calories, quantity }], meal_type, logged_on } — all required. */
+  bulkSaveFoodLog: async ({ items, meal_type, logged_on }) => {
     const response = await authFetch(`${API_BASE_URL}/calories/log/bulk/`, {
       method: 'POST',
-      body: JSON.stringify(entries),
+      body: JSON.stringify({ items, meal_type, logged_on }),
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail || 'Failed to save food log');
@@ -452,6 +484,7 @@ const api = {
     const response = await authFetch(`${API_BASE_URL}/reports/generate/`, {
       method: 'POST',
       body: JSON.stringify(params),
+      timeoutMs: AI_TIMEOUT_MS,
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail || data.error || 'Failed to generate report');
@@ -810,15 +843,18 @@ const api = {
   /* ---------- WORKOUT AGENT ---------- */
 
   /**
-   * POST /workout/api/enriched-workout/  (Public, 30/hr)
-   * Body: { prompt } or { exercises: [...] }
-   * Response: workout plan with YouTube video links per exercise
+   * POST /workout/api/enriched-workout/  (Auth required, 30/hr)
+   * Takes an existing AI plan and adds YouTube videos to each exercise. It does
+   * NOT generate a plan from a prompt — pass the output of generateAIPlan().
+   * Body: { weekly_workout_plan: [{ day, focus, duration_minutes, notes, exercises: [str] }], ... }
+   * Response: same shape, each exercise expanded to
+   *   { exercise_id, display_name, sets_reps, raw, videos: [{ title, url, channel }] }
    */
   getEnrichedWorkout: async (payload) => {
-    const response = await fetch(`${BASE_URL}/workout/api/enriched-workout/`, {
+    const response = await authFetch(`${BASE_URL}/workout/api/enriched-workout/`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
+      timeoutMs: AI_TIMEOUT_MS,
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || data.detail || 'Workout generation failed');
@@ -963,10 +999,10 @@ const api = {
     return data;
   },
 
+  /** Gym owner only — the API returns an empty list for everyone else. */
   getGymCampaigns: async (gymId) => {
-    const token = localStorage.getItem('access_token');
-    const headers = { ...(token && { Authorization: `Bearer ${token}` }) };
-    const response = await fetch(`${API_BASE_URL}/gyms/${gymId}/campaigns/list/`, { headers });
+    if (!localStorage.getItem('access_token')) return [];
+    const response = await authFetch(`${API_BASE_URL}/gyms/${gymId}/campaigns/list/`);
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail || 'Failed to fetch campaigns');
     return data;
